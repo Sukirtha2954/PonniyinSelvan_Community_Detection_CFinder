@@ -1,0 +1,230 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Interactive Vis Network (draggable nodes, colored by faction)</title>
+  <script type="text/javascript" src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+  <style>
+    body{font-family:Arial; margin:0}
+    #container { display:grid; grid-template-columns: 260px 1fr; height:100vh; gap:6px; }
+    .panel { padding:10px; background:#f7f9fc; overflow:auto; }
+    /* ENSURE network area has visible height */
+    #network {
+      background:#fff;
+      border:1px solid #ddd;
+      width: 100%;
+      height: calc(100vh - 24px);   /* ensure visible area */
+      min-height: 480px;
+    }
+    input[type="text"]{width:100%; padding:6px; box-sizing:border-box; margin-bottom:6px}
+    .legend-item{display:flex;align-items:center;margin:6px 0}
+    .swatch{width:18px;height:14px;margin-right:8px;border-radius:3px}
+    .small { font-size:12px; color:#333; margin-top:8px; display:block; }
+    .controls-row { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div class="panel">
+    <h3>Controls</h3>
+    <div><input id="search" type="text" placeholder="Search name & press Enter"></div>
+    <div><strong>Factions</strong><div id="faction-box"></div></div>
+    <div style="margin-top:8px"><strong>Communities</strong><div id="comm-box"></div></div>
+    <div class="controls-row">
+      <button id="reset-btn">Reset view</button>
+      <button id="save-pos-btn">Save positions (local)</button>
+      <button id="download-pos-btn">Download positions</button>
+      <input id="upload-file" type="file" accept=".json" style="display:none">
+      <button id="upload-pos-btn">Upload positions</button>
+      <button id="load-pos-btn">Load positions (local)</button>
+    </div>
+    <div class="small">Drag nodes to reposition. Downloaded JSON is commitable and portable.</div>
+  </div>
+
+  <div id="network"></div>
+</div>
+
+<script>
+// Data injected here
+const nodesData = [{"id": "Arulmozhi_Varman", "label": "Arulmozhi Varman", "faction": "Chola", "communities": [3], "value": 28, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Vandiyathevan", "label": "Vandiyathevan", "faction": "Chola", "communities": [3], "value": 30, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Nandhini", "label": "Nandhini", "faction": "Pandya", "communities": [1], "value": 19, "color": {"background": "#9467bd", "border": "#333333"}}, {"id": "Ravidasan", "label": "Ravidasan", "faction": "Pandya", "communities": [1], "value": 18, "color": {"background": "#9467bd", "border": "#333333"}}, {"id": "Aditha_Karikalan", "label": "Aditha Karikalan", "faction": "Chola", "communities": [3], "value": 27, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Kundhavai", "label": "Kundhavai", "faction": "Chola", "communities": [3], "value": 28, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Vanathi", "label": "Vanathi", "faction": "Chola", "communities": [3], "value": 24, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Chinna_Pazhuvettarayar", "label": "Chinna Pazhuvettarayar", "faction": "Pazhuvettarayar", "communities": [0], "value": 11, "color": {"background": "#8c564b", "border": "#333333"}}, {"id": "Periya_Pazhuvettarayar", "label": "Periya Pazhuvettarayar", "faction": "Pazhuvettarayar", "communities": [0], "value": 14, "color": {"background": "#8c564b", "border": "#333333"}}, {"id": "Soman_Sambavan", "label": "Soman Sambavan", "faction": "Pandya", "communities": [1], "value": 16, "color": {"background": "#9467bd", "border": "#333333"}}, {"id": "Azhwarkadiyan_Nambi", "label": "Azhwarkadiyan Nambi", "faction": "Chola", "communities": [3], "value": 24, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Sembiyan_Maadevi", "label": "Sembiyan Maadevi", "faction": "Chola", "communities": [3], "value": 25, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Esanyan", "label": "Esanyan", "faction": "Pandya", "communities": [1], "value": 15, "color": {"background": "#9467bd", "border": "#333333"}}, {"id": "Parameswaran", "label": "Parameswaran", "faction": "Pandya", "communities": [1], "value": 15, "color": {"background": "#9467bd", "border": "#333333"}}, {"id": "Parthibendran_Pallavan", "label": "Parthibendran Pallavan", "faction": "Chola", "communities": [3], "value": 25, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Ilaya_Pandiyan", "label": "Ilaya Pandiyan", "faction": "Pandya", "communities": [1], "value": 15, "color": {"background": "#9467bd", "border": "#333333"}}, {"id": "Pandya_Prince", "label": "Pandya Prince", "faction": "Pandya", "communities": [1], "value": 15, "color": {"background": "#9467bd", "border": "#333333"}}, {"id": "Poonguzhali", "label": "Poonguzhali", "faction": "Chola", "communities": [3], "value": 23, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Sundara_Chola", "label": "Sundara Chola", "faction": "Chola", "communities": [3], "value": 23, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Madhurantaka", "label": "Madhurantaka", "faction": "Pazhuvettarayar", "communities": [0], "value": 10, "color": {"background": "#8c564b", "border": "#333333"}}, {"id": "Manimekalai", "label": "Manimekalai", "faction": "Chola", "communities": [3], "value": 22, "color": {"background": "#1f77b4", "border": "#333333"}}, {"id": "Kadambur_Sambhuvarayar", "label": "Kadambur Sambhuvarayar", "faction": "Kadambur", "communities": [2], "value": 12, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Kandhamaran", "label": "Kandhamaran", "faction": "Kadambur", "communities": [2], "value": 14, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Aniruddha_Brahmarayar", "label": "Aniruddha Brahmarayar", "faction": "Religious", "communities": [], "value": 6, "color": {"background": "#e377c2", "border": "#333333"}}, {"id": "Bhikku", "label": "Bhikku", "faction": "Religious", "communities": [], "value": 6, "color": {"background": "#e377c2", "border": "#333333"}}, {"id": "Mahinda", "label": "Mahinda", "faction": "External", "communities": [], "value": 6, "color": {"background": "#ff7f0e", "border": "#333333"}}, {"id": "Ravidasa_Lanka", "label": "Ravidasa Lanka", "faction": "External", "communities": [], "value": 6, "color": {"background": "#ff7f0e", "border": "#333333"}}, {"id": "Idumban_Kari", "label": "Idumban Kari", "faction": "Pazhuvettarayar", "communities": [0], "value": 9, "color": {"background": "#8c564b", "border": "#333333"}}, {"id": "Chinna_Chieftain", "label": "Chinna Chieftain", "faction": "Kadambur", "communities": [2], "value": 13, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Kavimani", "label": "Kavimani", "faction": "Kadambur", "communities": [2], "value": 12, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Kothandaraman", "label": "Kothandaraman", "faction": "Kadambur", "communities": [2], "value": 11, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Periya_Chieftain", "label": "Periya Chieftain", "faction": "Kadambur", "communities": [2], "value": 13, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Malayaman", "label": "Malayaman", "faction": "Kadambur", "communities": [2], "value": 11, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Tirukovalur_Malaiyaman", "label": "Tirukovalur Malaiyaman", "faction": "Kadambur", "communities": [2], "value": 13, "color": {"background": "#2ca02c", "border": "#333333"}}, {"id": "Nambi_Maaman", "label": "Nambi Maaman", "faction": "Other", "communities": [], "value": 7, "color": {"background": "#d62728", "border": "#333333"}}, {"id": "Vellan", "label": "Vellan", "faction": "Other", "communities": [], "value": 6, "color": {"background": "#d62728", "border": "#333333"}}, {"id": "Kothai", "label": "Kothai", "faction": "Other", "communities": [], "value": 6, "color": {"background": "#d62728", "border": "#333333"}}];
+const edgesData = [{"id": "0", "from": "Arulmozhi_Varman", "to": "Vandiyathevan", "value": 20.0}, {"id": "1", "from": "Arulmozhi_Varman", "to": "Aditha_Karikalan", "value": 17.0}, {"id": "2", "from": "Arulmozhi_Varman", "to": "Kundhavai", "value": 15.0}, {"id": "3", "from": "Arulmozhi_Varman", "to": "Sundara_Chola", "value": 11.0}, {"id": "4", "from": "Arulmozhi_Varman", "to": "Sembiyan_Maadevi", "value": 10.0}, {"id": "5", "from": "Arulmozhi_Varman", "to": "Vanathi", "value": 9.0}, {"id": "6", "from": "Arulmozhi_Varman", "to": "Azhwarkadiyan_Nambi", "value": 8.0}, {"id": "7", "from": "Arulmozhi_Varman", "to": "Poonguzhali", "value": 7.0}, {"id": "8", "from": "Arulmozhi_Varman", "to": "Manimekalai", "value": 7.0}, {"id": "9", "from": "Arulmozhi_Varman", "to": "Parthibendran_Pallavan", "value": 7.0}, {"id": "10", "from": "Vandiyathevan", "to": "Azhwarkadiyan_Nambi", "value": 15.0}, {"id": "11", "from": "Vandiyathevan", "to": "Aditha_Karikalan", "value": 15.0}, {"id": "12", "from": "Vandiyathevan", "to": "Kundhavai", "value": 14.0}, {"id": "13", "from": "Vandiyathevan", "to": "Poonguzhali", "value": 12.0}, {"id": "14", "from": "Vandiyathevan", "to": "Parthibendran_Pallavan", "value": 9.0}, {"id": "15", "from": "Vandiyathevan", "to": "Sundara_Chola", "value": 9.0}, {"id": "16", "from": "Vandiyathevan", "to": "Manimekalai", "value": 8.0}, {"id": "17", "from": "Vandiyathevan", "to": "Sembiyan_Maadevi", "value": 7.0}, {"id": "18", "from": "Vandiyathevan", "to": "Vanathi", "value": 7.0}, {"id": "19", "from": "Nandhini", "to": "Ravidasan", "value": 18.0}, {"id": "20", "from": "Nandhini", "to": "Periya_Pazhuvettarayar", "value": 9.0}, {"id": "21", "from": "Nandhini", "to": "Pandya_Prince", "value": 8.0}, {"id": "22", "from": "Nandhini", "to": "Soman_Sambavan", "value": 8.0}, {"id": "23", "from": "Nandhini", "to": "Esanyan", "value": 8.0}, {"id": "24", "from": "Nandhini", "to": "Aditha_Karikalan", "value": 6.0}, {"id": "25", "from": "Nandhini", "to": "Ilaya_Pandiyan", "value": 6.0}, {"id": "26", "from": "Nandhini", "to": "Parameswaran", "value": 6.0}, {"id": "27", "from": "Ravidasan", "to": "Soman_Sambavan", "value": 16.0}, {"id": "28", "from": "Ravidasan", "to": "Parameswaran", "value": 8.0}, {"id": "29", "from": "Ravidasan", "to": "Ilaya_Pandiyan", "value": 7.0}, {"id": "30", "from": "Ravidasan", "to": "Pandya_Prince", "value": 6.0}, {"id": "31", "from": "Ravidasan", "to": "Esanyan", "value": 6.0}, {"id": "32", "from": "Aditha_Karikalan", "to": "Parthibendran_Pallavan", "value": 10.0}, {"id": "33", "from": "Aditha_Karikalan", "to": "Poonguzhali", "value": 10.0}, {"id": "34", "from": "Aditha_Karikalan", "to": "Manimekalai", "value": 10.0}, {"id": "35", "from": "Aditha_Karikalan", "to": "Sundara_Chola", "value": 8.0}, {"id": "36", "from": "Aditha_Karikalan", "to": "Sembiyan_Maadevi", "value": 8.0}, {"id": "37", "from": "Aditha_Karikalan", "to": "Kundhavai", "value": 7.0}, {"id": "38", "from": "Aditha_Karikalan", "to": "Vanathi", "value": 7.0}, {"id": "39", "from": "Aditha_Karikalan", "to": "Azhwarkadiyan_Nambi", "value": 7.0}, {"id": "40", "from": "Kundhavai", "to": "Vanathi", "value": 16.0}, {"id": "41", "from": "Kundhavai", "to": "Sembiyan_Maadevi", "value": 14.0}, {"id": "42", "from": "Kundhavai", "to": "Azhwarkadiyan_Nambi", "value": 10.0}, {"id": "43", "from": "Kundhavai", "to": "Manimekalai", "value": 9.0}, {"id": "44", "from": "Kundhavai", "to": "Parthibendran_Pallavan", "value": 9.0}, {"id": "45", "from": "Kundhavai", "to": "Sundara_Chola", "value": 9.0}, {"id": "46", "from": "Kundhavai", "to": "Poonguzhali", "value": 8.0}, {"id": "47", "from": "Vanathi", "to": "Parthibendran_Pallavan", "value": 10.0}, {"id": "48", "from": "Vanathi", "to": "Poonguzhali", "value": 9.0}, {"id": "49", "from": "Vanathi", "to": "Sembiyan_Maadevi", "value": 9.0}, {"id": "50", "from": "Vanathi", "to": "Sundara_Chola", "value": 9.0}, {"id": "51", "from": "Vanathi", "to": "Azhwarkadiyan_Nambi", "value": 8.0}, {"id": "52", "from": "Vanathi", "to": "Manimekalai", "value": 7.0}, {"id": "53", "from": "Chinna_Pazhuvettarayar", "to": "Periya_Pazhuvettarayar", "value": 16.0}, {"id": "54", "from": "Chinna_Pazhuvettarayar", "to": "Idumban_Kari", "value": 8.0}, {"id": "55", "from": "Chinna_Pazhuvettarayar", "to": "Madhurantaka", "value": 7.0}, {"id": "56", "from": "Periya_Pazhuvettarayar", "to": "Madhurantaka", "value": 10.0}, {"id": "57", "from": "Periya_Pazhuvettarayar", "to": "Idumban_Kari", "value": 7.0}, {"id": "58", "from": "Soman_Sambavan", "to": "Ilaya_Pandiyan", "value": 8.0}, {"id": "59", "from": "Soman_Sambavan", "to": "Pandya_Prince", "value": 8.0}, {"id": "60", "from": "Soman_Sambavan", "to": "Parameswaran", "value": 7.0}, {"id": "61", "from": "Soman_Sambavan", "to": "Esanyan", "value": 7.0}, {"id": "62", "from": "Azhwarkadiyan_Nambi", "to": "Parthibendran_Pallavan", "value": 13.0}, {"id": "63", "from": "Azhwarkadiyan_Nambi", "to": "Manimekalai", "value": 9.0}, {"id": "64", "from": "Azhwarkadiyan_Nambi", "to": "Poonguzhali", "value": 8.0}, {"id": "65", "from": "Azhwarkadiyan_Nambi", "to": "Sundara_Chola", "value": 7.0}, {"id": "66", "from": "Azhwarkadiyan_Nambi", "to": "Sembiyan_Maadevi", "value": 7.0}, {"id": "67", "from": "Sembiyan_Maadevi", "to": "Sundara_Chola", "value": 10.0}, {"id": "68", "from": "Sembiyan_Maadevi", "to": "Parthibendran_Pallavan", "value": 10.0}, {"id": "69", "from": "Sembiyan_Maadevi", "to": "Manimekalai", "value": 10.0}, {"id": "70", "from": "Sembiyan_Maadevi", "to": "Poonguzhali", "value": 8.0}, {"id": "71", "from": "Esanyan", "to": "Parameswaran", "value": 13.0}, {"id": "72", "from": "Esanyan", "to": "Pandya_Prince", "value": 7.0}, {"id": "73", "from": "Esanyan", "to": "Ilaya_Pandiyan", "value": 6.0}, {"id": "74", "from": "Parameswaran", "to": "Ilaya_Pandiyan", "value": 8.0}, {"id": "75", "from": "Parameswaran", "to": "Pandya_Prince", "value": 6.0}, {"id": "76", "from": "Parthibendran_Pallavan", "to": "Sundara_Chola", "value": 10.0}, {"id": "77", "from": "Parthibendran_Pallavan", "to": "Poonguzhali", "value": 9.0}, {"id": "78", "from": "Parthibendran_Pallavan", "to": "Manimekalai", "value": 7.0}, {"id": "79", "from": "Ilaya_Pandiyan", "to": "Pandya_Prince", "value": 12.0}, {"id": "80", "from": "Poonguzhali", "to": "Manimekalai", "value": 9.0}, {"id": "81", "from": "Poonguzhali", "to": "Sundara_Chola", "value": 7.0}, {"id": "82", "from": "Sundara_Chola", "to": "Manimekalai", "value": 7.0}, {"id": "83", "from": "Madhurantaka", "to": "Idumban_Kari", "value": 8.0}, {"id": "84", "from": "Kadambur_Sambhuvarayar", "to": "Kandhamaran", "value": 10.0}, {"id": "85", "from": "Kadambur_Sambhuvarayar", "to": "Chinna_Chieftain", "value": 7.0}, {"id": "86", "from": "Kadambur_Sambhuvarayar", "to": "Malayaman", "value": 6.0}, {"id": "87", "from": "Kadambur_Sambhuvarayar", "to": "Kothandaraman", "value": 6.0}, {"id": "88", "from": "Kadambur_Sambhuvarayar", "to": "Tirukovalur_Malaiyaman", "value": 6.0}, {"id": "89", "from": "Kandhamaran", "to": "Malayaman", "value": 7.0}, {"id": "90", "from": "Kandhamaran", "to": "Kavimani", "value": 7.0}, {"id": "91", "from": "Kandhamaran", "to": "Periya_Chieftain", "value": 6.0}, {"id": "92", "from": "Kandhamaran", "to": "Tirukovalur_Malaiyaman", "value": 6.0}, {"id": "93", "from": "Kandhamaran", "to": "Chinna_Chieftain", "value": 6.0}, {"id": "94", "from": "Aniruddha_Brahmarayar", "to": "Bhikku", "value": 9.0}, {"id": "95", "from": "Mahinda", "to": "Ravidasa_Lanka", "value": 9.0}, {"id": "96", "from": "Chinna_Chieftain", "to": "Kavimani", "value": 7.0}, {"id": "97", "from": "Chinna_Chieftain", "to": "Tirukovalur_Malaiyaman", "value": 7.0}, {"id": "98", "from": "Chinna_Chieftain", "to": "Kothandaraman", "value": 7.0}, {"id": "99", "from": "Chinna_Chieftain", "to": "Periya_Chieftain", "value": 6.0}, {"id": "100", "from": "Kavimani", "to": "Tirukovalur_Malaiyaman", "value": 7.0}, {"id": "101", "from": "Kavimani", "to": "Periya_Chieftain", "value": 6.0}, {"id": "102", "from": "Kavimani", "to": "Kothandaraman", "value": 6.0}, {"id": "103", "from": "Kothandaraman", "to": "Periya_Chieftain", "value": 7.0}, {"id": "104", "from": "Kothandaraman", "to": "Malayaman", "value": 6.0}, {"id": "105", "from": "Periya_Chieftain", "to": "Tirukovalur_Malaiyaman", "value": 7.0}, {"id": "106", "from": "Periya_Chieftain", "to": "Malayaman", "value": 6.0}, {"id": "107", "from": "Malayaman", "to": "Tirukovalur_Malaiyaman", "value": 7.0}, {"id": "108", "from": "Nambi_Maaman", "to": "Vellan", "value": 5.0}, {"id": "109", "from": "Nambi_Maaman", "to": "Kothai", "value": 5.0}];
+const commLabels = {"0": "Pazhuvettarayar (size=4)", "1": "Pandya (size=7)", "2": "Kadambur (size=8)", "3": "Chola (size=11)"};
+const factionsList = ["Chola", "External", "Kadambur", "Other", "Pandya", "Pazhuvettarayar", "Religious"];
+
+// build vis DataSets
+const nodes = new vis.DataSet(nodesData);
+const edges = new vis.DataSet(edgesData);
+
+const container = document.getElementById('network');
+const data = { nodes: nodes, edges: edges };
+const options = {
+  physics: {
+    stabilization: { enabled: true, iterations: 1000, updateInterval: 50 },
+    barnesHut: { gravitationalConstant: -2000, springLength: 150, springConstant: 0.01 }
+  },
+  interaction: { hover: true, dragNodes: true, dragView: true, zoomView: true },
+  nodes: {
+    shape: 'dot',
+    size: 16,
+    font: { size: 14 },
+    borderWidth: 1
+  },
+  edges: {
+    color: '#999',
+    width: 1,
+    smooth: { type: 'continuous' }
+  }
+};
+const network = new vis.Network(container, data, options);
+
+// Ensure layout is visible after physics stabilizes
+network.once("stabilizationIterationsDone", function () {
+  try {
+    // stop physics so nodes stay where you place them
+    network.setOptions({ physics: false });
+  } catch(e){}
+  try { network.fit({ animation: { duration: 500 } }); } catch(e){}
+});
+
+// also fit after initial draw (safety)
+network.once("afterDrawing", function () {
+  try { network.fit({ animation: { duration: 400 } }); } catch(e){}
+});
+
+// fallback fit after short delay
+setTimeout(()=> { try { network.fit({ animation: { duration: 300 } }); } catch(e){} }, 700);
+
+// Populate faction checkboxes and community checkboxes
+const fbox = document.getElementById('faction-box');
+const cbox = document.getElementById('comm-box');
+
+factionsList.forEach((f, idx) => {
+  const id = 'f_' + idx;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = `<label><input type="checkbox" id="${id}" checked data-f="${f}"> ${f}</label>`;
+  fbox.appendChild(wrapper);
+});
+Object.keys(commLabels).forEach(cid => {
+  const id = 'c_' + cid;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = `<label><input type="checkbox" id="${id}" checked data-c="${cid}"> ${commLabels[cid]}</label>`;
+  cbox.appendChild(wrapper);
+});
+
+// filtering
+function applyFilters(){
+  const activeFactions = Array.from(document.querySelectorAll('#faction-box input:checked')).map(n=>n.dataset.f);
+  const activeComms = Array.from(document.querySelectorAll('#comm-box input:checked')).map(n=>n.dataset.c);
+  const visible = nodesData
+    .filter(n=>{
+      if (activeFactions.length && activeFactions.indexOf(n.faction) === -1) return false;
+      if (activeComms.length){
+        if (!n.communities || n.communities.length===0) return false;
+        // keep node if it intersects any active comm
+        return n.communities.some(x => activeComms.indexOf(String(x)) !== -1);
+      }
+      return true;
+    })
+    .map(n => n.id);
+  // update vis by toggling visibility
+  nodes.forEach(node => {
+    const show = visible.indexOf(node.id) !== -1;
+    nodes.update({id: node.id, hidden: !show});
+  });
+}
+document.querySelectorAll('#faction-box input, #comm-box input').forEach(e=>e.addEventListener('change', applyFilters));
+
+// Ensure filters applied once so nodes are not accidentally hidden
+applyFilters();
+
+// search
+document.getElementById('search').addEventListener('keydown', function(e){
+  if (e.key === 'Enter'){
+    const q = this.value.trim().toLowerCase();
+    if (!q) return;
+    const found = nodesData.filter(n => n.label.toLowerCase().includes(q));
+    if (!found.length) { alert('No node'); return; }
+    const id = found[0].id;
+    network.focus(id, {scale:1.5, animation:{duration:500}});
+    nodes.update({id: id, color:{border:'#000', background:'#FFFF66'}});
+    setTimeout(()=>{ nodes.update({id:id, color:undefined}); }, 3000);
+  }
+});
+
+// reset
+document.getElementById('reset-btn').addEventListener('click', ()=>{ network.fit(); });
+
+// LOCAL storage save/load (existing behavior)
+document.getElementById('save-pos-btn').addEventListener('click', ()=>{
+  const pos = network.getPositions();
+  localStorage.setItem('ps_positions', JSON.stringify(pos));
+  alert('Positions saved to localStorage');
+});
+document.getElementById('load-pos-btn').addEventListener('click', ()=>{
+  const raw = localStorage.getItem('ps_positions');
+  if (!raw) { alert('No saved positions'); return; }
+  try {
+    const pos = JSON.parse(raw);
+    // set positions and fix nodes at those positions
+    Object.keys(pos).forEach(id => nodes.update({id: id, x: pos[id].x, y: pos[id].y, fixed:{x:true, y:true}}));
+    // stop physics to keep them where loaded
+    network.setOptions({ physics: false });
+    network.fit();
+    alert('Positions loaded (nodes fixed). Reload to unlock if needed.');
+  } catch(e){ alert('Invalid saved positions'); }
+});
+
+// DOWNLOAD positions -> saves a JSON file you can commit
+document.getElementById('download-pos-btn').addEventListener('click', ()=>{
+  try {
+    const pos = network.getPositions(); // { nodeId: {x:.., y:..}, ... }
+    const dataStr = JSON.stringify(pos, null, 2);
+    const blob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ps_positions.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch(e){
+    alert('Could not download positions: ' + e);
+  }
+});
+
+// UPLOAD positions -> select a JSON file and load positions into network
+document.getElementById('upload-pos-btn').addEventListener('click', ()=>{
+  const inp = document.getElementById('upload-file');
+  inp.value = null;
+  inp.click();
+});
+document.getElementById('upload-file').addEventListener('change', function(e){
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      const pos = JSON.parse(ev.target.result);
+      // basic validation: object with numeric x,y for some keys
+      // apply positions and fix nodes (optionally you may want them unlocked)
+      Object.keys(pos).forEach(id => {
+        if (typeof pos[id] === 'object' && 'x' in pos[id] && 'y' in pos[id]) {
+          // ensure node exists, else ignore
+          try { nodes.update({id: id, x: pos[id].x, y: pos[id].y, fixed:{x:true, y:true}}); } catch(_){}
+        }
+      });
+      // stop physics and fit
+      network.setOptions({ physics: false });
+      network.fit();
+      alert('Positions loaded from file (nodes fixed). Reload to unlock if needed.');
+    } catch(err){
+      alert('Failed to parse positions file: ' + err);
+    }
+  };
+  reader.readAsText(f);
+});
+
+</script>
+</body>
+</html>
